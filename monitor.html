@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkyPort v3 Monitor</title>
+    <style>
+        :root {
+            --bg-color: #0f111a;
+            --card-bg: #1a1d2d;
+            --text-main: #a9b1d6;
+            --accent-cyan: #2ac3de;
+            --accent-green: #9ece6a;
+            --accent-magenta: #bb9af7;
+            --accent-yellow: #e0af68;
+            --border: #2f354b;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 600px;
+        }
+
+        h1 {
+            color: var(--accent-cyan);
+            text-align: center;
+            margin-bottom: 2rem;
+            text-shadow: 0 0 10px rgba(42, 195, 222, 0.3);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-cyan);
+        }
+
+        .label {
+            font-size: 0.9rem;
+            color: var(--text-main);
+            opacity: 0.7;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            display: block;
+        }
+
+        .status-dot {
+            height: 12px;
+            width: 12px;
+            background-color: var(--accent-green);
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+
+        .blink {
+            animation: blinker 1.5s linear infinite;
+        }
+
+        @keyframes blinker {
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .footer {
+            margin-top: 3rem;
+            font-size: 0.8rem;
+            opacity: 0.5;
+            text-align: center;
+        }
+
+        /* Color variants */
+        .v-cyan {
+            color: var(--accent-cyan);
+        }
+
+        .v-green {
+            color: var(--accent-green);
+        }
+
+        .v-magenta {
+            color: var(--accent-magenta);
+        }
+
+        .v-yellow {
+            color: var(--accent-yellow);
+        }
+
+        #error-msg {
+            color: #f7768e;
+            display: none;
+            margin-top: 1rem;
+            text-align: center;
+            border: 1px solid #f7768e;
+            padding: 10px;
+            border-radius: 5px;
+            background: rgba(247, 118, 142, 0.1);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <pre
+            style="font-size: 10px; line-height: 10px; color: var(--accent-cyan); text-align: center; margin-bottom: 30px;">
+   _____ __ ____  ______________  ______  ___   __________ 
+  / ___// //_/\ \/ /_  __/ / / / / | / / | / / ____/ /  
+  \__ \/ ,<    \  /  / / / / / / /  |/ /  |/ / __/ / /   
+ ___/ / /| |   / /  / / / /_/ / / /|  / /|  / /___/ /___ 
+/____/_/ |_|  /_/  /_/  \____/_/_/ |_/_/ |_/_____/_____/ 
+        </pre>
+
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <span class="status-dot blink" id="status-dot"></span>
+            <span id="server-status">Connecting...</span>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <span class="label">ACTIVE TUNNELS</span>
+                <span class="value v-cyan" id="active-tunnels">-</span>
+            </div>
+            <div class="card">
+                <span class="label">TOTAL CONNECTIONS</span>
+                <span class="value v-magenta" id="total-conn">-</span>
+            </div>
+            <div class="card">
+                <span class="label">MAX CAPACITY</span>
+                <span class="value v-yellow" id="max-users">-</span>
+            </div>
+            <div class="card">
+                <span class="label">SERVER LOAD</span>
+                <span class="value v-green" id="load-percent">-</span>
+            </div>
+        </div>
+
+        <div id="error-msg">
+            ⚠️ Connection lost. Ensure SkyPort is running on 89.167.27.96:9090.
+            <br>
+            <small>(You may need to enable CORS in your browser or serve this file via HTTP)</small>
+        </div>
+
+        <div class="footer">
+            Target: 89.167.27.96 • Auto-refresh: 2s
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://89.167.27.96:9090';
+
+        async function fetchStats() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const data = await response.json();
+
+                // Update UI
+                document.getElementById('active-tunnels').textContent = data.active_tunnels;
+                document.getElementById('total-conn').textContent = data.total_connections;
+                document.getElementById('max-users').textContent = data.max_users;
+
+                // Calculate Load %
+                const load = Math.round((data.active_tunnels / data.max_users) * 100);
+                document.getElementById('load-percent').textContent = load + '%';
+
+                // Status OK
+                document.getElementById('server-status').textContent = "SYSTEM ONLINE";
+                document.getElementById('server-status').style.color = "var(--accent-green)";
+                document.getElementById('status-dot').style.backgroundColor = "var(--accent-green)";
+                document.getElementById('error-msg').style.display = 'none';
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                document.getElementById('server-status').textContent = "OFFLINE";
+                document.getElementById('server-status').style.color = "#f7768e";
+                document.getElementById('status-dot').style.backgroundColor = "#f7768e";
+                document.getElementById('error-msg').style.display = 'block';
+
+                // Clear values
+                ['active-tunnels', 'total-conn', 'max-users', 'load-percent'].forEach(id => {
+                    document.getElementById(id).textContent = '-';
+                });
+            }
+        }
+
+        // Initial fetch then interval
+        fetchStats();
+        setInterval(fetchStats, 2000);
+    </script>
+</body>
+
+</html>
