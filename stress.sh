@@ -1,38 +1,72 @@
 #!/bin/bash
 
-# Infinite loop to keep the process going forever
+# ==========================================
+# 1. Start Python HTTP Server
+# ==========================================
+echo "Starting Python HTTP Server on port 8000..."
+
+# We run this in the background (&) so the script can continue
+# We redirect output to /dev/null so server logs don't mess up the screen
+python -m http.server 8000 > /dev/null 2>&1 &
+
+# Capture the Process ID (PID) of the python server so we can kill it later
+SERVER_PID=$!
+
+echo "Server running (PID: $SERVER_PID). Starting tunnel loop..."
+sleep 2
+
+# ==========================================
+# 2. cleanup Function
+# ==========================================
+# This runs when you press Ctrl+C to ensure the python server shuts down
+cleanup() {
+    echo ""
+    echo "Shutting down..."
+    
+    # Kill the Python server
+    if kill -0 $SERVER_PID 2>/dev/null; then
+        echo "Stopping Python Server (PID: $SERVER_PID)..."
+        kill $SERVER_PID
+    fi
+
+    # Kill any remaining SSH tunnels
+    echo "Cleaning up tunnels..."
+    pkill -f "ssh -p 2222 -R 0:localhost:8000 free@free.skytunnel.dev"
+    
+    exit
+}
+
+# Trap the Ctrl+C signal (SIGINT)
+trap cleanup SIGINT
+
+# ==========================================
+# 3. The Tunnel Loop
+# ==========================================
 while true; do
-    # 1. Generate a random number between 31 and 48
-    # $(( RANDOM % 18 )) gives 0-17. Adding 31 gives 31-48.
+    # Generate random number between 31 and 48
     COUNT=$(( ( RANDOM % 18 ) + 31 ))
     
-    echo "=========================================="
-    echo "Starting new cycle: Opening $COUNT tunnels"
-    echo "=========================================="
+    echo "------------------------------------------"
+    echo "Cycle Start: Opening $COUNT tunnels"
+    echo "------------------------------------------"
 
-    # 2. Loop to open the specific number of tunnels
     for (( i=1; i<=COUNT; i++ )); do
-        # -N: Do not execute a remote command (just forward ports)
-        # -f: Go to background
-        # We redirect output to /dev/null to keep the screen clean, 
-        # remove "> /dev/null 2>&1" if you want to see the port numbers assigned.
         ssh -p 2222 -R 0:localhost:8000 free@free.skytunnel.dev -N -f > /dev/null 2>&1
-        
-        # A tiny pause is healthy to prevent choking your network adapter
+        # Slight delay to prevent network choking
         sleep 0.2
     done
 
-    echo "$COUNT tunnels are now active."
+    echo "$COUNT tunnels active."
     echo "Waiting 10 minutes..."
 
-    # 3. Wait for 600 seconds (10 minutes)
+    # Wait 10 minutes (600 seconds)
     sleep 600
 
-    echo "Time is up! Disconnecting all tunnels..."
+    echo "Time is up! Refreshing tunnels..."
 
-    # 4. Kill only the specific SSH processes we started
+    # Kill only the tunnels (keep Python server running)
     pkill -f "ssh -p 2222 -R 0:localhost:8000 free@free.skytunnel.dev"
-
-    echo "All tunnels closed. Restarting in 2 seconds..."
+    
+    echo "Restarting loop in 2 seconds..."
     sleep 2
 done
